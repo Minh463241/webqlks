@@ -293,31 +293,47 @@ def add_room():
         room_types = get_all_room_types()
         return render_template('add_room.html', room_types=room_types)
     
-    so_phong = request.form.get('room_number')
-    ma_loai_phong = request.form.get('room_type')
-    mo_ta = request.form.get('description')
-    trang_thai = "Trống"
-    
-    if not ma_loai_phong or not ma_loai_phong.strip():
-        flash("Chưa chọn loại phòng.", "error")
+    try:
+        so_phong = request.form.get('room_number')
+        ma_loai_phong = request.form.get('room_type')
+        mo_ta = request.form.get('description')
+        trang_thai = "Trống"
+        
+        if not ma_loai_phong or not ma_loai_phong.strip():
+            flash("Chưa chọn loại phòng.", "error")
+            return redirect(url_for('add_room'))
+        
+        file = request.files.get('room_image')
+        if file and allowed_file(file.filename):
+            filename = secure_filename(file.filename)
+            temp_folder = "/tmp"
+            if not os.path.exists(temp_folder):
+                os.makedirs(temp_folder)
+            temp_path = f"/tmp/{filename}"
+            
+            # Lưu file vào /tmp
+            file.save(temp_path)
+            
+            # Gọi hàm add_room_with_image để tạo phòng + upload ảnh
+            add_room_with_image(temp_path, f"room_{filename}", so_phong, ma_loai_phong, mo_ta, "", trang_thai)
+            
+            # Xóa file tạm
+            os.remove(temp_path)
+        else:
+            # Nếu không có file ảnh, chỉ thêm phòng vào DB
+            add_room_to_db(so_phong, ma_loai_phong, mo_ta, trang_thai)
+        
+        flash("Thêm phòng thành công!", "success")
         return redirect(url_for('add_room'))
     
-    file = request.files.get('room_image')
-    if file and allowed_file(file.filename):
-        filename = secure_filename(file.filename)
-        temp_folder = "/tmp"
-        if not os.path.exists(temp_folder):
-            os.makedirs(temp_folder)
-        temp_path = f"/tmp/{filename}"
-        file.save(temp_path)
-        # Hàm add_room_with_image xử lý tạo phòng và upload ảnh
-        add_room_with_image(temp_path, f"room_{filename}", so_phong, ma_loai_phong, mo_ta, "", trang_thai)
-        os.remove(temp_path)
-    else:
-        add_room_to_db(so_phong, ma_loai_phong, mo_ta, trang_thai)
-    
-    flash("Thêm phòng thành công!", "success")
-    return redirect(url_for('add_room'))
+    except Exception as e:
+        # Ghi log lỗi chi tiết (stack trace) để debug
+        import traceback
+        traceback.print_exc()
+        
+        # Thông báo lỗi cho người dùng (nếu muốn)
+        flash(f"Lỗi khi thêm phòng: {str(e)}", "error")
+        return redirect(url_for('add_room'))
 
 
 # -------------------------------
