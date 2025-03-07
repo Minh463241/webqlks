@@ -225,16 +225,8 @@ def get_admin_by_email_and_password(email, password):
 def get_all_rooms():
     return list(rooms_collection.find())
 
-def get_room_images_by_room(ma_phong):
-    return list(room_images_collection.find({'MaPhong': ma_phong}))
-
-# Lấy hình ảnh đầu tiên của phòng:
-images = get_room_images_by_room(ma_phong)
-if images:
-    room_image = images[0].get('DuongDanAnh', 'https://example.com/default_room.jpg')
-else:
-    room_image = 'https://example.com/default_room.jpg'
-
+def get_room_by_id(ma_phong):
+    return rooms_collection.find_one({'MaPhong': ma_phong})
 
 def create_room(room_data):
     # Sao chép dữ liệu và loại bỏ 'MaPhong' nếu có
