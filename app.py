@@ -293,6 +293,7 @@ def add_room():
         room_types = get_all_room_types()
         return render_template('add_room.html', room_types=room_types)
     
+    # Lấy thông tin từ form
     so_phong = request.form.get('room_number')
     ma_loai_phong = request.form.get('room_type')
     mo_ta = request.form.get('description')
@@ -305,19 +306,29 @@ def add_room():
     file = request.files.get('room_image')
     if file and allowed_file(file.filename):
         filename = secure_filename(file.filename)
-        temp_folder = os.path.join(app.root_path, 'temp')
+        # Sử dụng thư mục /tmp để lưu tạm file (phù hợp với môi trường read-only)
+        temp_folder = '/tmp'
         if not os.path.exists(temp_folder):
             os.makedirs(temp_folder)
         temp_path = os.path.join(temp_folder, filename)
-        file.save(temp_path)
-        # Hàm add_room_with_image xử lý tạo phòng và upload ảnh
-        add_room_with_image(temp_path, f"room_{filename}", so_phong, ma_loai_phong, mo_ta, "", trang_thai)
-        os.remove(temp_path)
+        try:
+            file.save(temp_path)
+            # Tạo phòng kèm upload ảnh
+            add_room_with_image(temp_path, f"room_{filename}", so_phong, ma_loai_phong, mo_ta, "", trang_thai)
+        except Exception as e:
+            flash(f"Lỗi khi lưu file: {e}", "error")
+            return redirect(url_for('add_room'))
+        finally:
+            # Xóa file tạm nếu có
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
     else:
+        # Nếu không có file, chỉ thêm thông tin phòng
         add_room_to_db(so_phong, ma_loai_phong, mo_ta, trang_thai)
     
     flash("Thêm phòng thành công!", "success")
     return redirect(url_for('add_room'))
+
 
 # -------------------------------
 # ROUTE: Trang cá nhân
