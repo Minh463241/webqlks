@@ -5,6 +5,7 @@ from flask import Flask, flash, render_template, request, redirect, url_for, ses
 from werkzeug.utils import secure_filename
 import functools
 from datetime import timedelta, datetime
+import hmac
 
 # Import các hàm từ db_mongo.py (MongoDB)
 from db_mongo import (
@@ -533,11 +534,16 @@ def vnpay_return():
 
     sorted_data = sorted(data.items())
     sign_data = '&'.join(["{}={}".format(k, v) for k, v in sorted_data])
+    
+    secret_key = "*bzwzl9d&aq)rg2z9(@twit_)=5fp77et3i&l4-xp1h$r)^+gp"  # Secret key của bạn
 
-    secret_key = "*bzwzl9d&aq)rg2z9(@twit_)=5fp77et3i&l4-xp1h$r)^+gp"
-    my_hash = hashlib.sha256((secret_key + sign_data).encode('utf-8')).hexdigest()
+    my_hash = hmac.new(
+        secret_key.encode('utf-8'),
+        sign_data.encode('utf-8'),
+        hashlib.sha256
+    ).hexdigest().upper()
 
-    if my_hash.upper() == (received_hash or "").upper():
+    if my_hash == (received_hash or "").upper():
         response_code = data.get('vnp_ResponseCode', '99')
         if response_code == '00':
             flash("Thanh toán thành công!", "success")
@@ -548,6 +554,7 @@ def vnpay_return():
     else:
         flash("Chữ ký không hợp lệ, giao dịch bị từ chối!", "error")
         return redirect(url_for('index'))
+
 
 @app.route('/admin/accounts', methods=['GET', 'POST'])
 @admin_required
