@@ -249,7 +249,7 @@ def admin_login():
             return redirect(url_for('admin_accounts'))
         else:
             error = "Thông tin đăng nhập không chính xác"
-            return render_template('login.html', error=error)
+            return render_template('admin_login.html', error=error)
     return render_template('admin_login.html')
 
 @app.route('/staff/dashboard')
