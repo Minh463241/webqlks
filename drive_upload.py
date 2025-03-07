@@ -4,8 +4,8 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
 SCOPES = ['https://www.googleapis.com/auth/drive.file']
-SERVICE_ACCOUNT_FILE = os.path.join(os.path.dirname(__file__), 'up2.json')
-FOLDER_ID = '120x9O34Cbn8LyjOmo0sBuczbLh_fHIWm'
+SERVICE_ACCOUNT_FILE = os.path.join(os.path.dirname(__file__), 'up3.json')
+FOLDER_ID = '121E26ll7oMi2rjZH4wTTjbntUd_4BOgH'
 
 def upload_file_to_drive(file_path, filename):
     credentials = service_account.Credentials.from_service_account_file(

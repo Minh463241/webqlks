@@ -248,6 +248,7 @@ def create_room(room_data):
     
     return inserted_id_str
 
+
 def update_room(ma_phong, update_data):
     result = rooms_collection.update_one({'MaPhong': ma_phong}, {'$set': update_data})
     return result.modified_count
