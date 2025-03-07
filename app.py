@@ -494,7 +494,7 @@ def create_payment():
     vnp_IpAddr = request.remote_addr
 
     # ---- SECRET KEY MỚI NHẤT TỪ EMAIL ----
-    secret_key = "PFXLYYRTB9CSQLSD2Q6QXRANW4RHLTEB"
+    secret_key = "4S9912D3XK3XRPHID3KGFED1MKA072Y0"
 
     vnp_params = {
         "vnp_Version": vnp_Version,
@@ -546,7 +546,7 @@ def vnpay_return():
     sign_data = '&'.join(["{}={}".format(k, v) for k, v in sorted_data])
 
     # Phải dùng cùng secret key
-    secret_key = "PFXLYYRTB9CSQLSD2Q6QXRANW4RHLTEB"
+    secret_key = "4S9912D3XK3XRPHID3KGFED1MKA072Y0"
 
     my_hash = hmac.new(
         secret_key.encode('utf-8'),
