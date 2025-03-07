@@ -178,7 +178,7 @@ def add_room_to_db(so_phong, ma_loai_phong, mo_ta, trang_thai):
     }
     return create_room(room_data)
 
-def add_room_with_image(file_path, filename, so_phong, ma_loai_phong, mo_ta, image_description, trang_thai):
+def add_room_with_image(file_path, filename, so_phong, ma_loai_phong, mo_ta, image_description="", trang_thai="Trống"):
     # Tạo phòng mới và lấy ID phòng
     room_id = add_room_to_db(so_phong, ma_loai_phong, mo_ta, trang_thai)
     
