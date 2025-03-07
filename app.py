@@ -480,18 +480,18 @@ def create_payment():
     amount = request.args.get('amount', default=1000000, type=int)
     vnp_Version = "2.1.0"
     vnp_Command = "pay"
-    vnp_TmnCode = "YOUR_TMN_CODE"  # Thay bằng TmnCode của bạn
+    vnp_TmnCode = "DLM4AXOP"  # Sử dụng TmnCode từ tài khoản Sandbox của bạn
     vnp_Amount = str(amount * 100)
     vnp_CurrCode = "VND"
     vnp_TxnRef = "ORDER" + datetime.now().strftime("%H%M%S")
-    vnp_OrderInfo = "Thanh toán đặt phòng khách sạn"
-    vnp_OrderType = "other"
+    vnp_OrderInfo = "Thanh toán qua ví VNPay"
+    vnp_OrderType = "wallet"  # Sử dụng loại giao dịch cho ví VNPay
     vnp_Locale = "vn"
     vnp_SecureHashType = "SHA256"
     vnp_ReturnUrl = url_for('vnpay_return', _external=True)
     vnp_CreateDate = datetime.now().strftime("%Y%m%d%H%M%S")
     vnp_IpAddr = request.remote_addr
-    secret_key = "YOUR_SECRET_KEY"  # Thay bằng secret key của bạn
+    secret_key = "*bzwzl9d&aq)rg2z9(@twit_)=5fp77et3i&l4-xp1h$r)^+gp"  # Sử dụng secret key tương ứng
 
     vnp_params = {
         "vnp_Version": vnp_Version,
@@ -522,6 +522,7 @@ def create_payment():
 
     print("Payment URL:", payment_url)
     return redirect(payment_url)
+
 
 @app.route('/vnpay_return')
 def vnpay_return():
