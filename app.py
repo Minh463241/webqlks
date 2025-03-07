@@ -481,18 +481,20 @@ def create_payment():
     amount = request.args.get('amount', default=1000000, type=int)
     vnp_Version = "2.1.0"
     vnp_Command = "pay"
-    vnp_TmnCode = "DLM4AXOP"  # Sử dụng TmnCode từ tài khoản Sandbox của bạn
+    vnp_TmnCode = "DLM4AXOP"  # Sử dụng TmnCode từ email
     vnp_Amount = str(amount * 100)
     vnp_CurrCode = "VND"
     vnp_TxnRef = "ORDER" + datetime.now().strftime("%H%M%S")
     vnp_OrderInfo = "Thanh toán qua ví VNPay"
-    vnp_OrderType = "wallet"  # Sử dụng loại giao dịch cho ví VNPay
+    vnp_OrderType = "wallet"  
     vnp_Locale = "vn"
     vnp_SecureHashType = "HmacSHA256"
     vnp_ReturnUrl = url_for('vnpay_return', _external=True)
     vnp_CreateDate = datetime.now().strftime("%Y%m%d%H%M%S")
     vnp_IpAddr = request.remote_addr
-    secret_key = "*bzwzl9d&aq)rg2z9(@twit_)=5fp77et3i&l4-xp1h$r)^+gp"  # Sử dụng secret key tương ứng
+
+    # ---- SECRET KEY MỚI NHẤT TỪ EMAIL ----
+    secret_key = "8GL70NJJJFVTM920EP3CB4EO4ZPHTOXB"
 
     vnp_params = {
         "vnp_Version": vnp_Version,
@@ -511,10 +513,16 @@ def create_payment():
     }
 
     sorted_vnp_params = sorted(vnp_params.items())
-    query_string = urllib.parse.urlencode(sorted_vnp_params)
     sign_data = '&'.join(["{}={}".format(k, v) for k, v in sorted_vnp_params])
-    secure_hash = hashlib.sha256((secret_key + sign_data).encode('utf-8')).hexdigest()
 
+    # Dùng HMAC SHA256 để ký
+    secure_hash = hmac.new(
+        secret_key.encode('utf-8'),
+        sign_data.encode('utf-8'),
+        hashlib.sha256
+    ).hexdigest().upper()
+
+    query_string = urllib.parse.urlencode(sorted_vnp_params)
     payment_url = (
         "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html?"
         + query_string
@@ -524,18 +532,21 @@ def create_payment():
     print("Payment URL:", payment_url)
     return redirect(payment_url)
 
-
 @app.route('/vnpay_return')
 def vnpay_return():
     data = request.args.to_dict()
     print("VNPay callback data:", data)
+
+    # Bóc tách SecureHash
     received_hash = data.pop('vnp_SecureHash', None)
     received_hash_type = data.pop('vnp_SecureHashType', None)
 
+    # Sắp xếp tham số còn lại
     sorted_data = sorted(data.items())
     sign_data = '&'.join(["{}={}".format(k, v) for k, v in sorted_data])
-    
-    secret_key = "*bzwzl9d&aq)rg2z9(@twit_)=5fp77et3i&l4-xp1h$r)^+gp"  # Secret key của bạn
+
+    # Phải dùng cùng secret key
+    secret_key = "8GL70NJJJFVTM920EP3CB4EO4ZPHTOXB"
 
     my_hash = hmac.new(
         secret_key.encode('utf-8'),
@@ -547,13 +558,12 @@ def vnpay_return():
         response_code = data.get('vnp_ResponseCode', '99')
         if response_code == '00':
             flash("Thanh toán thành công!", "success")
-            return redirect(url_for('index'))
         else:
             flash(f"Thanh toán thất bại. Mã lỗi: {response_code}", "error")
-            return redirect(url_for('index'))
     else:
         flash("Chữ ký không hợp lệ, giao dịch bị từ chối!", "error")
-        return redirect(url_for('index'))
+
+    return redirect(url_for('index'))
 
 
 @app.route('/admin/accounts', methods=['GET', 'POST'])
