@@ -618,5 +618,9 @@ def date_format(value, format_str="%d/%m/%Y"):
     except Exception as e:
         return value
 
+@app.route('/time', methods=['GET'])
+def get_time():
+    return jsonify({"current_utc_time": datetime.utcnow().isoformat()})
+
 if __name__ == '__main__':
     app.run(debug=True)
