@@ -494,7 +494,7 @@ def create_payment():
     vnp_IpAddr = request.remote_addr
 
     # ---- SECRET KEY MỚI NHẤT TỪ EMAIL ----
-    secret_key = "8GL70NJJJFVTM920EP3CB4EO4ZPHTOXB"
+    secret_key = "PFXLYYRTB9CSQLSD2Q6QXRANW4RHLTEB"
 
     vnp_params = {
         "vnp_Version": vnp_Version,
