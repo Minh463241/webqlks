@@ -546,7 +546,7 @@ def vnpay_return():
     sign_data = '&'.join(["{}={}".format(k, v) for k, v in sorted_data])
 
     # Phải dùng cùng secret key
-    secret_key = "8GL70NJJJFVTM920EP3CB4EO4ZPHTOXB"
+    secret_key = "PFXLYYRTB9CSQLSD2Q6QXRANW4RHLTEB"
 
     my_hash = hmac.new(
         secret_key.encode('utf-8'),
