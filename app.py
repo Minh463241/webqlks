@@ -488,7 +488,7 @@ def create_payment():
     vnp_OrderInfo = "Thanh toán qua ví VNPay"
     vnp_OrderType = "wallet"  # Sử dụng loại giao dịch cho ví VNPay
     vnp_Locale = "vn"
-    vnp_SecureHashType = "SHA256"
+    vnp_SecureHashType = "HmacSHA256"
     vnp_ReturnUrl = url_for('vnpay_return', _external=True)
     vnp_CreateDate = datetime.now().strftime("%Y%m%d%H%M%S")
     vnp_IpAddr = request.remote_addr
