@@ -41,7 +41,7 @@ from drive_upload import upload_file_to_drive
 # Cài đặt Stripe
 # -------------------------------
 import stripe
-# Thay bằng Secret key test của bạn
+# Thay bằng Secret key test của bạn (lấy từ Dashboard Stripe)
 stripe.api_key = "sk_test_51QzvBe4ItrNbWOZiuMzul21da8fG1mtQa5hj4nznqqje0PbD0zKUpKekh4rcQWlSrSnlzrCknEPAqAKYQdbpmNTs00u4BJTBxR"
 
 app = Flask(__name__)
@@ -324,7 +324,6 @@ def add_room():
 # -------------------------------
 @app.route('/profile')
 def profile():
-    # Kiểm tra nếu khách hàng đã đăng nhập
     if 'email' not in session:
         flash("Bạn cần đăng nhập để xem trang cá nhân.", "error")
         return redirect(url_for('auth_bp.login'))
@@ -476,8 +475,11 @@ def booking(room_id):
             'phone': phone,
         }
         create_booking(booking_data)
-        # Sau khi đặt phòng xong, chuyển hướng thanh toán qua Stripe Checkout
-        return redirect(url_for('create_payment', amount=tong_gia))
+        # Lấy URL hình ảnh của phòng từ MongoDB
+        # Giả sử trường 'image_url' được lưu trong document phòng
+        room_image = room.get('image_url', 'https://example.com/default_room.jpg')
+        # Chuyển hướng đến Stripe Checkout, truyền số tiền và URL hình ảnh
+        return redirect(url_for('create_payment', amount=tong_gia, room_image=room_image))
 
 # -------------------------------
 # ROUTE: Tích hợp Thanh toán Stripe (Checkout Session)
@@ -496,9 +498,9 @@ def create_payment():
                     'currency': 'usd',
                     'product_data': {
                         'name': 'Thanh toán đặt phòng khách sạn',
-                        'images': [room_image],  # Truyền URL hình ảnh ở đây
+                        'images': [room_image],
                     },
-                    'unit_amount': amount,  # Số tiền tính bằng cents
+                    'unit_amount': amount,
                 },
                 'quantity': 1,
             }],
@@ -510,7 +512,6 @@ def create_payment():
         return redirect(session_stripe.url, code=303)
     except Exception as e:
         return str(e), 400
-
 
 @app.route('/stripe_success')
 def stripe_success():

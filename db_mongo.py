@@ -56,15 +56,8 @@ def update_user_avatar(email, avatar_filename):
 def update_customer(email, update_data):
     """
     Cập nhật thông tin khách hàng dựa trên email.
-    
-    update_data có thể chứa các trường:
-      - "HoTen": Tên khách hàng
-      - "DienThoai": Số điện thoại
-      - "CMND": CCCD/Hộ chiếu
-      - "DiaChi": Địa chỉ
-      - "avatar": Tên file avatar mới
-      - "bg_image": Tên file ảnh nền giao diện mới
-      - "password": Mật khẩu mới (nên mã hóa trước khi lưu)
+    update_data có thể chứa các trường như:
+      - "HoTen", "DienThoai", "CMND", "DiaChi", "avatar", "bg_image", "password", ...
     """
     result = customers_collection.update_one(
         {"Email": email},
@@ -85,7 +78,7 @@ def get_room_images_by_room(ma_phong):
 def get_first_room_image(ma_phong):
     """
     Lấy hình ảnh đầu tiên của phòng dựa trên MaPhong.
-    Nếu không có, trả về một URL mặc định.
+    Nếu không có, trả về URL mặc định.
     """
     images = get_room_images_by_room(ma_phong)
     if images:
@@ -170,76 +163,18 @@ def create_room_type(room_type_data):
 # Alias để dùng trong app
 add_room_type = create_room_type
 
-def add_room_to_db(so_phong, ma_loai_phong, mo_ta, trang_thai):
-    try:
-        room_type = room_types_collection.find_one({'_id': ObjectId(ma_loai_phong)})
-    except Exception as e:
-        raise ValueError("ID loại phòng không hợp lệ: " + str(ma_loai_phong))
-    if not room_type:
-        raise ValueError("Không tìm thấy loại phòng với ID: " + str(ma_loai_phong))
-    
-    price = room_type.get('price', 0)
-    room_data = {
-        'MaPhong': None,  # Sẽ được cập nhật sau khi chèn
-        'SoPhong': so_phong,
-        'MaLoaiPhong': ma_loai_phong,  # Lưu ID loại phòng dưới dạng string
-        'TrangThai': trang_thai,
-        'MoTa': mo_ta,
-        'price': price,
-        'created_at': datetime.utcnow()
-    }
-    return create_room(room_data)
-
-def add_room_with_image(file_path, filename, so_phong, ma_loai_phong, mo_ta, image_description, trang_thai):
-    # Tạo phòng mới và lấy ID phòng
-    room_id = add_room_to_db(so_phong, ma_loai_phong, mo_ta, trang_thai)
-    
-    # Sử dụng hàm upload từ file drive_upload.py
-    from drive_upload import upload_file_to_drive
-    image_url = upload_file_to_drive(file_path, filename)
-
-    room_image_data = {
-        'MaAnh': None,
-        'MaPhong': room_id,         # Liên kết ảnh với phòng vừa tạo
-        'DuongDanAnh': image_url,   # Đường dẫn ảnh từ Google Drive
-        'MoTa': image_description,
-        'uploaded_at': datetime.utcnow()
-    }
-    create_room_image(room_image_data)
-    
-    # Cập nhật document phòng với thông tin ảnh để hiển thị trong danh sách phòng
-    update_room(room_id, {'image_url': image_url, 'image_url_hd': image_url})
-    
-    return room_id
-
 # ---------------------------
-# Nhân viên (Admin)
-# ---------------------------
-def get_staff_by_email(email):
-    return staff_collection.find_one({'Email': email})
-
-def create_staff(staff_data):
-    result = staff_collection.insert_one(staff_data)
-    return str(result.inserted_id)
-
-def get_all_staff():
-    return list(staff_collection.find())
-
-def get_admin_by_email_and_password(email, password):
-    admin = staff_collection.find_one({'Email': email})
-    if admin and admin.get('password') == password:
-        return admin
-    return None
-
-# ---------------------------
-# Phòng
+# PHÒNG: Các hàm liên quan đến phòng
 # ---------------------------
 def get_all_rooms():
     return list(rooms_collection.find())
 
-# ---------------------------
-# Tạo và cập nhật phòng
-# ---------------------------
+def get_room_by_id(ma_phong):
+    """
+    Lấy thông tin của phòng dựa trên MaPhong.
+    """
+    return rooms_collection.find_one({'MaPhong': ma_phong})
+
 def create_room(room_data):
     # Sao chép dữ liệu và loại bỏ 'MaPhong' nếu có
     doc = dict(room_data)
@@ -265,13 +200,31 @@ def update_room(ma_phong, update_data):
     return result.modified_count
 
 # ---------------------------
+# Nhân viên (Admin)
+# ---------------------------
+def get_staff_by_email(email):
+    return staff_collection.find_one({'Email': email})
+
+def create_staff(staff_data):
+    result = staff_collection.insert_one(staff_data)
+    return str(result.inserted_id)
+
+def get_all_staff():
+    return list(staff_collection.find())
+
+def get_admin_by_email_and_password(email, password):
+    admin = staff_collection.find_one({'Email': email})
+    if admin and admin.get('password') == password:
+        return admin
+    return None
+
+# ---------------------------
 # Nhân viên (Admin) - Các hàm quản lý nhân viên
 # ---------------------------
 def create_staff(staff_data):
     """
     Tạo một tài khoản nhân viên mới.
     Nếu không có trường 'role' trong staff_data, mặc định gán là 'staff'.
-    Lưu ý: Nên mã hóa mật khẩu trước khi lưu.
     """
     if 'role' not in staff_data or not staff_data['role']:
         staff_data['role'] = 'staff'
