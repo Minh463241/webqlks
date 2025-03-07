@@ -41,8 +41,8 @@ from drive_upload import upload_file_to_drive
 # Cài đặt Stripe
 # -------------------------------
 import stripe
-# Thay bằng Secret key test của bạn
-stripe.api_key = "sk_test_51QzvBe4ItrNbWOZiuMzul21da8fG1mtQa5hj4nznqqje0PbD0zKUpKekh4rcQWlSrSnlzrCknEPAqAKYQdbpmNTs00u4BJTBxR"
+# Thay bằng Secret key test của bạn (lấy từ Dashboard Stripe, ví dụ: "sk_test_...")
+stripe.api_key = "sk_test_XXXXXXXXXXXXXXXXXXXXXXXX"
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
@@ -249,7 +249,7 @@ def admin_login():
             return redirect(url_for('admin_accounts'))
         else:
             error = "Thông tin đăng nhập không chính xác"
-            return render_template('admin_login.html', error=error)
+            return render_template('login.html', error=error)
     return render_template('admin_login.html')
 
 @app.route('/staff/dashboard')
@@ -438,6 +438,7 @@ def booking(room_id):
             tong_gia=tong_gia
         )
     else:
+        # Lấy dữ liệu từ form bao gồm checkin và checkout (giả sử form có gửi các trường này)
         checkin_str = request.form.get('checkin')
         checkout_str = request.form.get('checkout')
         room = get_room_by_id(room_id)
@@ -474,6 +475,7 @@ def booking(room_id):
             'postal_code': postal_code,
             'region_code': region_code,
             'phone': phone,
+            # Các trường khác cần thêm theo logic của bạn
         }
         create_booking(booking_data)
         # Sau khi đặt phòng xong, chuyển hướng thanh toán qua Stripe Checkout
@@ -485,10 +487,10 @@ def booking(room_id):
 @app.route('/create_payment')
 def create_payment():
     # Lấy số tiền thanh toán (đơn vị: cents)
-    amount = request.args.get('amount', default=1000, type=int)
-    # Lấy URL hình ảnh phòng từ tham số, nếu không có dùng default image
-    room_image = request.args.get('room_image', 'https://example.com/default_room.jpg')
+    # Ví dụ: nếu tong_gia là 1000, nghĩa là $10.00
+    amount = request.args.get('amount', default=100000, type=int)
     try:
+        # Tạo Stripe Checkout Session
         session_stripe = stripe.checkout.Session.create(
             payment_method_types=['card'],
             line_items=[{
@@ -496,9 +498,8 @@ def create_payment():
                     'currency': 'usd',
                     'product_data': {
                         'name': 'Thanh toán đặt phòng khách sạn',
-                        'images': [room_image],  # Truyền URL hình ảnh ở đây
                     },
-                    'unit_amount': amount,  # Số tiền tính bằng cents
+                    'unit_amount': amount,  # amount in cents
                 },
                 'quantity': 1,
             }],
