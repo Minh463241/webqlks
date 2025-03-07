@@ -37,6 +37,13 @@ from db_mongo import (
 # Giả sử bạn vẫn sử dụng hàm upload_file_to_drive từ drive_upload.py
 from drive_upload import upload_file_to_drive
 
+# -------------------------------
+# Cài đặt Stripe
+# -------------------------------
+import stripe
+# Thay bằng Secret key test của bạn
+stripe.api_key = "sk_test_51QzvBe4ItrNbWOZiuMzul21da8fG1mtQa5hj4nznqqje0PbD0zKUpKekh4rcQWlSrSnlzrCknEPAqAKYQdbpmNTs00u4BJTBxR"
+
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 app.permanent_session_lifetime = timedelta(days=7)
@@ -431,7 +438,6 @@ def booking(room_id):
             tong_gia=tong_gia
         )
     else:
-        # Lấy dữ liệu từ form bao gồm checkin và checkout (giả sử form có gửi các trường này)
         checkin_str = request.form.get('checkin')
         checkout_str = request.form.get('checkout')
         room = get_room_by_id(room_id)
@@ -468,104 +474,54 @@ def booking(room_id):
             'postal_code': postal_code,
             'region_code': region_code,
             'phone': phone,
-            # Các trường khác cần thêm theo logic của bạn
         }
         create_booking(booking_data)
+        # Sau khi đặt phòng xong, chuyển hướng thanh toán qua Stripe Checkout
         return redirect(url_for('create_payment', amount=tong_gia))
 
 # -------------------------------
-# ROUTE: Tích hợp Thanh toán VNPay
+# ROUTE: Tích hợp Thanh toán Stripe (Checkout Session)
 # -------------------------------
 @app.route('/create_payment')
 def create_payment():
-    amount = request.args.get('amount', default=1000000, type=int)
-    vnp_Version = "2.1.0"
-    vnp_Command = "pay"
-    vnp_TmnCode = "DLM4AXOP"  # Sử dụng TmnCode từ email
-    vnp_Amount = str(amount * 100)
-    vnp_CurrCode = "VND"
-    vnp_TxnRef = "ORDER" + datetime.now().strftime("%H%M%S")
-    vnp_OrderInfo = "Thanh toán qua ví VNPay"
-    vnp_OrderType = "wallet"  
-    vnp_Locale = "vn"
-    vnp_SecureHashType = "HmacSHA256"
-    vnp_ReturnUrl = url_for('vnpay_return', _external=True)
-    vnp_CreateDate = datetime.now().strftime("%Y%m%d%H%M%S")
-    vnp_IpAddr = request.remote_addr
+    # Lấy số tiền thanh toán (đơn vị: cents)
+    # Ví dụ: nếu tong_gia là 1000, tức là $10.00
+    amount = request.args.get('amount', default=1000, type=int)
+    try:
+        session_stripe = stripe.checkout.Session.create(
+            payment_method_types=['card'],
+            line_items=[{
+                'price_data': {
+                    'currency': 'usd',
+                    'product_data': {
+                        'name': 'Thanh toán đặt phòng khách sạn',
+                    },
+                    'unit_amount': amount,  # Số tiền tính bằng cents
+                },
+                'quantity': 1,
+            }],
+            mode='payment',
+            success_url=url_for('stripe_success', _external=True) + '?session_id={CHECKOUT_SESSION_ID}',
+            cancel_url=url_for('stripe_cancel', _external=True),
+        )
+        print("Stripe Checkout Session URL:", session_stripe.url)
+        return redirect(session_stripe.url, code=303)
+    except Exception as e:
+        return str(e), 400
 
-    # ---- SECRET KEY MỚI NHẤT TỪ EMAIL ----
-    secret_key = "4S9912D3XK3XRPHID3KGFED1MKA072Y0"
-
-    vnp_params = {
-        "vnp_Version": vnp_Version,
-        "vnp_Command": vnp_Command,
-        "vnp_TmnCode": vnp_TmnCode,
-        "vnp_Amount": vnp_Amount,
-        "vnp_CurrCode": vnp_CurrCode,
-        "vnp_TxnRef": vnp_TxnRef,
-        "vnp_OrderInfo": vnp_OrderInfo,
-        "vnp_OrderType": vnp_OrderType,
-        "vnp_Locale": vnp_Locale,
-        "vnp_ReturnUrl": vnp_ReturnUrl,
-        "vnp_CreateDate": vnp_CreateDate,
-        "vnp_IpAddr": vnp_IpAddr,
-        "vnp_SecureHashType": vnp_SecureHashType
-    }
-
-    sorted_vnp_params = sorted(vnp_params.items())
-    sign_data = '&'.join(["{}={}".format(k, v) for k, v in sorted_vnp_params])
-
-    # Dùng HMAC SHA256 để ký
-    secure_hash = hmac.new(
-        secret_key.encode('utf-8'),
-        sign_data.encode('utf-8'),
-        hashlib.sha256
-    ).hexdigest().upper()
-
-    query_string = urllib.parse.urlencode(sorted_vnp_params)
-    payment_url = (
-        "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html?"
-        + query_string
-        + "&vnp_SecureHash=" + secure_hash
-    )
-
-    print("Payment URL:", payment_url)
-    return redirect(payment_url)
-
-@app.route('/vnpay_return')
-def vnpay_return():
-    data = request.args.to_dict()
-    print("VNPay callback data:", data)
-
-    # Bóc tách SecureHash
-    received_hash = data.pop('vnp_SecureHash', None)
-    received_hash_type = data.pop('vnp_SecureHashType', None)
-
-    # Sắp xếp tham số còn lại
-    sorted_data = sorted(data.items())
-    sign_data = '&'.join(["{}={}".format(k, v) for k, v in sorted_data])
-
-    # Phải dùng cùng secret key
-    secret_key = "4S9912D3XK3XRPHID3KGFED1MKA072Y0"
-
-    my_hash = hmac.new(
-        secret_key.encode('utf-8'),
-        sign_data.encode('utf-8'),
-        hashlib.sha256
-    ).hexdigest().upper()
-
-    if my_hash == (received_hash or "").upper():
-        response_code = data.get('vnp_ResponseCode', '99')
-        if response_code == '00':
-            flash("Thanh toán thành công!", "success")
-        else:
-            flash(f"Thanh toán thất bại. Mã lỗi: {response_code}", "error")
-    else:
-        flash("Chữ ký không hợp lệ, giao dịch bị từ chối!", "error")
-
+@app.route('/stripe_success')
+def stripe_success():
+    flash("Thanh toán thành công!", "success")
     return redirect(url_for('index'))
 
+@app.route('/stripe_cancel')
+def stripe_cancel():
+    flash("Thanh toán đã bị hủy!", "error")
+    return redirect(url_for('index'))
 
+# -------------------------------
+# ROUTE: Quản trị Admin (các route admin khác giữ nguyên)
+# -------------------------------
 @app.route('/admin/accounts', methods=['GET', 'POST'])
 @admin_required
 def admin_accounts():
@@ -660,6 +616,6 @@ def date_format(value, format_str="%d/%m/%Y"):
         return dt.strftime(format_str)
     except Exception as e:
         return value
-    
+
 if __name__ == '__main__':
     app.run(debug=True)
