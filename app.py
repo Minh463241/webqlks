@@ -486,7 +486,7 @@ def booking(room_id):
 def create_payment():
     # Lấy số tiền thanh toán (đơn vị: cents)
     amount = request.args.get('amount', default=1000, type=int)
-    # Lấy URL hình ảnh phòng từ tham số, nếu không có dùng default image
+    # Lấy URL hình ảnh từ query string (nếu không có thì dùng ảnh mặc định)
     room_image = request.args.get('room_image', 'https://example.com/default_room.jpg')
     try:
         session_stripe = stripe.checkout.Session.create(
@@ -510,6 +510,7 @@ def create_payment():
         return redirect(session_stripe.url, code=303)
     except Exception as e:
         return str(e), 400
+
 
 @app.route('/stripe_success')
 def stripe_success():
