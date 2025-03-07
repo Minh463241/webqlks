@@ -485,8 +485,9 @@ def booking(room_id):
 @app.route('/create_payment')
 def create_payment():
     # Lấy số tiền thanh toán (đơn vị: cents)
-    # Ví dụ: nếu tong_gia là 1000, tức là $10.00
     amount = request.args.get('amount', default=1000, type=int)
+    # Lấy URL hình ảnh phòng từ tham số, nếu không có dùng default image
+    room_image = request.args.get('room_image', 'https://example.com/default_room.jpg')
     try:
         session_stripe = stripe.checkout.Session.create(
             payment_method_types=['card'],
@@ -495,6 +496,7 @@ def create_payment():
                     'currency': 'usd',
                     'product_data': {
                         'name': 'Thanh toán đặt phòng khách sạn',
+                        'images': [room_image],  # Truyền URL hình ảnh ở đây
                     },
                     'unit_amount': amount,  # Số tiền tính bằng cents
                 },
