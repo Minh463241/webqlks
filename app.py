@@ -305,10 +305,10 @@ def add_room():
     file = request.files.get('room_image')
     if file and allowed_file(file.filename):
         filename = secure_filename(file.filename)
-        temp_folder = os.path.join(app.root_path, 'temp')
+        temp_folder = "/tmp"
         if not os.path.exists(temp_folder):
             os.makedirs(temp_folder)
-        temp_path = os.path.join(temp_folder, filename)
+        temp_path = f"/tmp/{filename}"
         file.save(temp_path)
         # Hàm add_room_with_image xử lý tạo phòng và upload ảnh
         add_room_with_image(temp_path, f"room_{filename}", so_phong, ma_loai_phong, mo_ta, "", trang_thai)
