@@ -33,7 +33,7 @@ def upload_file_to_drive(file_path, filename):
         body=file_metadata,
         media_body=media,
         fields='id'
-    ).execute()
+    ).execute()c
 
     file_id = uploaded_file.get('id')
     if not file_id:
