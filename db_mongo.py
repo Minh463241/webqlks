@@ -13,14 +13,6 @@ client = MongoClient(MONGO_URI)
 db = client[DB_NAME]
 
 # ---------------------------
-# (Chú ý) Cấu hình Cloudinary (dùng trực tiếp nếu cần)
-# ---------------------------
-# CLOUDINARY_CLOUD_NAME = "dwczro6hp"
-# CLOUDINARY_API_KEY = "648677879979597"
-# CLOUDINARY_API_SECRET = "-1D5fNq5hrtfGoIeZ8U7n8GHWi0"
-CLOUDINARY_URL="cloudinary://648677879979597:-1D5fNq5hrtfGoIeZ8U7n8GHWi0@dwczro6hp"
-
-# ---------------------------
 # Các collection
 # ---------------------------
 customers_collection        = db['customers']
@@ -34,7 +26,7 @@ staff_collection            = db['staff']
 rooms_collection            = db['rooms']
 
 # ---------------------------
-# Khách hàng
+# KHÁCH HÀNG
 # ---------------------------
 def get_customer_by_email(email):
     return customers_collection.find_one({'Email': email})
@@ -60,6 +52,7 @@ def update_user_avatar(email, avatar_filename):
 def update_customer(email, update_data):
     """
     Cập nhật thông tin khách hàng dựa trên email.
+    
     update_data có thể chứa các trường:
       - "HoTen": Tên khách hàng
       - "DienThoai": Số điện thoại
@@ -76,7 +69,7 @@ def update_customer(email, update_data):
     return result.modified_count
 
 # ---------------------------
-# Ảnh phòng
+# ẢNH PHÒNG
 # ---------------------------
 def create_room_image(room_image_data):
     result = room_images_collection.insert_one(room_image_data)
@@ -86,7 +79,7 @@ def get_room_images_by_room(ma_phong):
     return list(room_images_collection.find({'MaPhong': ma_phong}))
 
 # ---------------------------
-# Đặt phòng
+# ĐẶT PHÒNG
 # ---------------------------
 def create_booking(booking_data):
     result = bookings_collection.insert_one(booking_data)
@@ -111,7 +104,7 @@ def is_room_booked(ma_phong, checkin_date, checkout_date):
     return booking is not None
 
 # ---------------------------
-# Dịch vụ
+# DỊCH VỤ
 # ---------------------------
 def get_service_by_id(ma_dich_vu):
     return services_collection.find_one({'MaDichVu': ma_dich_vu})
@@ -124,7 +117,7 @@ def get_all_services():
     return list(services_collection.find())
 
 # ---------------------------
-# Hóa đơn
+# HÓA ĐƠN
 # ---------------------------
 def create_invoice(invoice_data):
     result = invoices_collection.insert_one(invoice_data)
@@ -137,7 +130,7 @@ def get_all_invoices():
     return list(invoices_collection.find())
 
 # ---------------------------
-# Hóa đơn dịch vụ
+# HÓA ĐƠN DỊCH VỤ
 # ---------------------------
 def create_invoice_service(invoice_service_data):
     result = invoice_services_collection.insert_one(invoice_service_data)
@@ -147,7 +140,7 @@ def get_invoice_services_by_invoice(ma_hoa_don):
     return list(invoice_services_collection.find({'MaHoaDon': ma_hoa_don}))
 
 # ---------------------------
-# Loại phòng
+# LOẠI PHÒNG
 # ---------------------------
 def get_all_room_types():
     return list(room_types_collection.find())
@@ -186,7 +179,7 @@ def add_room_with_image(file_path, filename, so_phong, ma_loai_phong, mo_ta, ima
     # Tạo phòng mới và lấy ID phòng
     room_id = add_room_to_db(so_phong, ma_loai_phong, mo_ta, trang_thai)
     
-    # Sử dụng hàm upload từ file drive_upload.py để tải ảnh lên (giả sử hàm trả về URL ảnh)
+    # Sử dụng hàm upload từ file drive_upload.py
     from drive_upload import upload_file_to_drive
     image_url = upload_file_to_drive(file_path, filename)
 
@@ -205,7 +198,40 @@ def add_room_with_image(file_path, filename, so_phong, ma_loai_phong, mo_ta, ima
     return room_id
 
 # ---------------------------
-# Nhân viên (Admin)
+# PHÒNG
+# ---------------------------
+def create_room(room_data):
+    # Sao chép dữ liệu và loại bỏ 'MaPhong' nếu có
+    doc = dict(room_data)
+    doc.pop('MaPhong', None)
+    
+    # Chèn document vào MongoDB
+    result = rooms_collection.insert_one(doc)
+    inserted_id = result.inserted_id
+    inserted_id_str = str(inserted_id)
+    
+    # Cập nhật lại trường 'MaPhong' với giá trị của inserted_id (dạng chuỗi)
+    update_result = rooms_collection.update_one(
+        {'_id': inserted_id},
+        {'$set': {'MaPhong': inserted_id_str}}
+    )
+    if update_result.modified_count == 0:
+        print("[Warning] Không thể cập nhật MaPhong cho document vừa chèn.")
+    
+    return inserted_id_str
+
+def get_all_rooms():
+    return list(rooms_collection.find())
+
+def get_room_by_id(ma_phong):
+    return rooms_collection.find_one({'MaPhong': ma_phong})
+
+def update_room(ma_phong, update_data):
+    result = rooms_collection.update_one({'MaPhong': ma_phong}, {'$set': update_data})
+    return result.modified_count
+
+# ---------------------------
+# NHÂN VIÊN (Admin)
 # ---------------------------
 def get_staff_by_email(email):
     return staff_collection.find_one({'Email': email})
@@ -267,7 +293,7 @@ def delete_staff(staff_id):
     return result.deleted_count
 
 # ---------------------------
-# Các hàm lấy dữ liệu về trang cá nhân (lịch sử đặt phòng, dịch vụ sử dụng)
+# LỊCH SỬ ĐẶT PHÒNG & DỊCH VỤ SỬ DỤNG
 # ---------------------------
 def get_booking_history_by_customer(email):
     """
@@ -279,7 +305,6 @@ def get_services_used_by_customer(email):
     """
     Lấy danh sách dịch vụ đã sử dụng của khách hàng dựa trên email.
     """
-    # Tìm hóa đơn của khách hàng
     invoices = list(invoices_collection.find({"email": email}))
     services_used = []
     for invoice in invoices:
