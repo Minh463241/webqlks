@@ -22,7 +22,7 @@
     <!-- Form Register -->
     <div class="relative bg-white shadow-lg rounded-lg p-8">
       <h2 class="text-gray-700 text-2xl mb-6">Đăng Ký</h2>
-      <form id="registerForm" method="post" action="{{ url_for('auth_bp.register') }}">
+      <form id="registerForm" method="post" action="{{ url_for('register') }}">
         <div class="mb-4">
           <label class="block text-gray-600 text-sm mb-2" for="ho_ten">Họ tên</label>
           <input class="w-full px-3 py-2 border border-gray-300 rounded" type="text" name="ho_ten" id="ho_ten" placeholder="Nhập họ tên" required>
@@ -48,7 +48,7 @@
           <input class="w-full px-3 py-2 border border-gray-300 rounded" type="text" name="cmnd" id="cmnd" placeholder="Nhập số CMND hoặc CCCD" >
         </div>
         <div class="mb-6 text-right">
-          <a href="{{ url_for('auth_bp.login') }}" class="text-gray-500 text-sm">Đã có tài khoản? Đăng nhập</a>
+          <a href="{{ url_for('login') }}" class="text-gray-500 text-sm">Đã có tài khoản? Đăng nhập</a>
         </div>
         <div class="flex">
           <button type="submit" class="w-full py-2 bg-gray-800 text-white rounded">Đăng Ký</button>
