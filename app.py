@@ -6,6 +6,7 @@ from werkzeug.utils import secure_filename
 import functools
 from datetime import timedelta, datetime
 import hmac
+from drive_upload import upload_file_to_cloudinary
 
 # Import các hàm từ db_mongo.py (MongoDB)
 from db_mongo import (
@@ -30,11 +31,9 @@ from db_mongo import (
     staff_collection,
     get_booking_history_by_customer,
     get_services_used_by_customer,
-    update_customer
+    update_customer,
+    
 )
-
-# Giả sử bạn vẫn sử dụng hàm upload_file_to_drive từ drive_upload.py
-from drive_upload import upload_file_to_drive
 
 # -------------------------------
 # Cài đặt Stripe
@@ -43,13 +42,7 @@ import stripe
 # Thay bằng Secret key test của bạn
 stripe.api_key = "sk_test_51QzvBe4ItrNbWOZiuMzul21da8fG1mtQa5hj4nznqqje0PbD0zKUpKekh4rcQWlSrSnlzrCknEPAqAKYQdbpmNTs00u4BJTBxR"
 
-# -------------------------------
-# Cấu hình Cloudinary
-# -------------------------------
-import cloudinary
-import cloudinary.uploader
-# Lưu ý: Biến CLOUDINARY_URL phải được set từ biến môi trường hoặc file cấu hình
-cloudinary.config(secure=True)
+
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
@@ -211,9 +204,12 @@ def update_avatar():
             return redirect(request.url)
         
         if file and allowed_file(file.filename):
-            # Upload avatar lên Cloudinary thay vì lưu cục bộ
-            upload_result = cloudinary.uploader.upload(file, folder="avatars")
-            avatar_url = upload_result.get("secure_url")
+            filename = secure_filename(file.filename)
+            # Lưu tạm file vào thư mục cấu hình (UPLOAD_FOLDER)
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            file.save(file_path)
+            # Upload file lên Cloudinary qua hàm upload_file_to_cloudinary
+            avatar_url = upload_file_to_cloudinary(file_path, filename, folder="avatars")
             update_user_avatar(session['email'], avatar_url)
             session['avatar'] = avatar_url
             flash("Avatar cập nhật thành công!", "success")
@@ -222,7 +218,6 @@ def update_avatar():
             flash("Loại file không được chấp nhận.", "error")
             return redirect(request.url)
 
-app.register_blueprint(auth_bp)
 
 # -------------------------------
 # ROUTE: Quản trị Admin
@@ -307,18 +302,13 @@ def add_room():
         mo_ta = request.form.get('description')
         trang_thai = "Trống"
         
-        if not ma_loai_phong or not ma_loai_phong.strip():
-            flash("Chưa chọn loại phòng.", "error")
-            return redirect(url_for('add_room'))
-        
         file = request.files.get('room_image')
         if file and allowed_file(file.filename):
             filename = secure_filename(file.filename)
-            # Upload ảnh phòng lên Cloudinary (thư mục "rooms")
-            upload_result = cloudinary.uploader.upload(file, folder="rooms")
-            image_url = upload_result.get("secure_url")
-            # Gọi hàm add_room_with_image để thêm phòng và lưu đường dẫn ảnh trên Cloudinary
-            add_room_with_image(image_url, f"room_{filename}", so_phong, ma_loai_phong, mo_ta, image_url, trang_thai)
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            file.save(file_path)
+            # Hàm add_room_with_image sẽ upload ảnh lên Cloudinary qua hàm trong upload.py
+            add_room_with_image(file_path, filename, so_phong, ma_loai_phong, mo_ta, image_description="Ảnh phòng", trang_thai=trang_thai)
         else:
             # Nếu không có file ảnh, chỉ thêm phòng vào DB
             add_room_to_db(so_phong, ma_loai_phong, mo_ta, trang_thai)
@@ -327,14 +317,9 @@ def add_room():
         return redirect(url_for('add_room'))
     
     except Exception as e:
-        # Ghi log lỗi chi tiết (stack trace) để debug
-        import traceback
-        traceback.print_exc()
         flash(f"Lỗi khi thêm phòng: {str(e)}", "error")
         return redirect(url_for('add_room'))
 
-if __name__ == '__main__':
-    app.run(debug=True)
 
 
 # -------------------------------
@@ -540,6 +525,7 @@ def stripe_cancel():
 # -------------------------------
 # ROUTE: Quản trị Admin (các route admin khác giữ nguyên)
 # -------------------------------
+#thêm nhân viên
 @app.route('/admin/accounts', methods=['GET', 'POST'])
 @admin_required
 def admin_accounts():

@@ -1,40 +1,25 @@
-import os
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload
+import cloudinary
+import cloudinary.uploader
 
-SCOPES = ['https://www.googleapis.com/auth/drive.file']
-SERVICE_ACCOUNT_FILE = os.path.join(os.path.dirname(__file__), 'up3.json')
-FOLDER_ID = '121E26ll7oMi2rjZH4wTTjbntUd_4BOgH'
+# Cấu hình Cloudinary với thông tin trực tiếp
+cloudinary.config(
+    cloud_name="dwczro6hp",
+    api_key="648677879979597",
+    api_secret="-1D5fNq5hrtfGoIeZ8U7n8GHWi0",
+    secure=True
+)
 
-def upload_file_to_drive(file_path, filename):
-    credentials = service_account.Credentials.from_service_account_file(
-        SERVICE_ACCOUNT_FILE, scopes=SCOPES)
-    drive_service = build('drive', 'v3', credentials=credentials)
+def upload_file_to_cloudinary(file_path, filename, folder="rooms"):
+    """
+    Upload file lên Cloudinary và trả về URL của file.
     
-    file_metadata = {'name': filename}
-    if FOLDER_ID:
-        file_metadata['parents'] = [FOLDER_ID]
-    
-    media = MediaFileUpload(file_path, resumable=True)
-    uploaded_file = drive_service.files().create(
-        body=file_metadata,
-        media_body=media,
-        fields='id'
-    ).execute()
-    
-    # Lấy ID file từ phản hồi của API
-    file_id = uploaded_file.get('id')
-    if not file_id:
-        raise Exception("Không lấy được file_id từ response")
-    
-    # Tạo quyền truy cập công khai cho file
-    permission = {'type': 'anyone', 'role': 'reader'}
-    drive_service.permissions().create(
-        fileId=file_id,
-        body=permission
-    ).execute()
-    
-    # Tạo URL nhúng trực tiếp từ file_id với định dạng https://lh3.googleusercontent.com/d/ID-ANH=w1000
-    direct_url = f"https://lh3.googleusercontent.com/d/{file_id}=w1000"
-    return direct_url
+    :param file_path: Đường dẫn file trên máy cục bộ.
+    :param filename: Tên file sẽ được lưu trên Cloudinary (public_id).
+    :param folder: Thư mục lưu trên Cloudinary.
+    :return: secure_url của file đã upload.
+    """
+    upload_result = cloudinary.uploader.upload(file_path, folder=folder, public_id=filename)
+    url = upload_result.get("secure_url")
+    if not url:
+        raise Exception("Không thể upload file lên Cloudinary.")
+    return url
