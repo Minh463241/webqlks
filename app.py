@@ -44,11 +44,19 @@ import stripe
 # Thay bằng Secret key test của bạn
 stripe.api_key = "sk_test_51QzvBe4ItrNbWOZiuMzul21da8fG1mtQa5hj4nznqqje0PbD0zKUpKekh4rcQWlSrSnlzrCknEPAqAKYQdbpmNTs00u4BJTBxR"
 
+# -------------------------------
+# Cấu hình Cloudinary
+# -------------------------------
+import cloudinary
+import cloudinary.uploader
+# Lưu ý: Biến CLOUDINARY_URL phải được set từ biến môi trường hoặc file cấu hình
+cloudinary.config(secure=True)
+
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 app.permanent_session_lifetime = timedelta(days=7)
 
-# Cấu hình cho file upload avatar
+# Cấu hình cho file upload avatar (sẽ không dùng cho local nữa)
 UPLOAD_FOLDER = os.path.join(app.root_path, 'static', 'avatars')
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
@@ -204,14 +212,11 @@ def update_avatar():
             return redirect(request.url)
         
         if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
-            filename = f"user_{session['user_id']}_{filename}"
-            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            if not os.path.exists(app.config['UPLOAD_FOLDER']):
-                os.makedirs(app.config['UPLOAD_FOLDER'])
-            file.save(file_path)
-            update_user_avatar(session['email'], filename)
-            session['avatar'] = filename
+            # Upload avatar lên Cloudinary thay vì lưu cục bộ
+            upload_result = cloudinary.uploader.upload(file, folder="avatars")
+            avatar_url = upload_result.get("secure_url")
+            update_user_avatar(session['email'], avatar_url)
+            session['avatar'] = avatar_url
             flash("Avatar cập nhật thành công!", "success")
             return redirect(url_for('index'))
         else:
@@ -246,10 +251,11 @@ def admin_login():
             if session['role'] != 'admin':
                 flash("Tài khoản nhân viên không được phép truy cập chức năng admin", "danger")
                 return redirect(url_for('staff_dashboard'))
-            return redirect(url_for('admin_accounts'))
+            # Chuyển hướng đến trang dashboard admin
+            return redirect(url_for('admin_dashboard'))
         else:
             error = "Thông tin đăng nhập không chính xác"
-            return render_template('login.html', error=error)
+            return render_template('admin_login.html', error=error)
     return render_template('admin_login.html')
 
 @app.route('/staff/dashboard')
@@ -287,6 +293,9 @@ def add_room_type_route():
             flash("Thêm loại phòng thất bại.", "error")
             return redirect(url_for('add_room_type_route'))
 
+# -------------------------------
+# ROUTE: Thêm phòng (upload ảnh lên Cloudinary)
+# -------------------------------
 @app.route('/add_room', methods=['GET', 'POST'])
 def add_room():
     if request.method == 'GET':
@@ -306,19 +315,11 @@ def add_room():
         file = request.files.get('room_image')
         if file and allowed_file(file.filename):
             filename = secure_filename(file.filename)
-            temp_folder = "/tmp"
-            if not os.path.exists(temp_folder):
-                os.makedirs(temp_folder)
-            temp_path = f"/tmp/{filename}"
-            
-            # Lưu file vào /tmp
-            file.save(temp_path)
-            
-            # Gọi hàm add_room_with_image để tạo phòng + upload ảnh
-            add_room_with_image(temp_path, f"room_{filename}", so_phong, ma_loai_phong, mo_ta, "", trang_thai)
-            
-            # Xóa file tạm
-            os.remove(temp_path)
+            # Upload ảnh phòng lên Cloudinary (thư mục "rooms")
+            upload_result = cloudinary.uploader.upload(file, folder="rooms")
+            image_url = upload_result.get("secure_url")
+            # Gọi hàm add_room_with_image để thêm phòng và lưu đường dẫn ảnh trên Cloudinary
+            add_room_with_image(image_url, f"room_{filename}", so_phong, ma_loai_phong, mo_ta, image_url, trang_thai)
         else:
             # Nếu không có file ảnh, chỉ thêm phòng vào DB
             add_room_to_db(so_phong, ma_loai_phong, mo_ta, trang_thai)
@@ -330,12 +331,14 @@ def add_room():
         # Ghi log lỗi chi tiết (stack trace) để debug
         import traceback
         traceback.print_exc()
-        
-        # Thông báo lỗi cho người dùng (nếu muốn)
         flash(f"Lỗi khi thêm phòng: {str(e)}", "error")
         return redirect(url_for('add_room'))
 
+if __name__ == '__main__':
+    app.run(debug=True)
 
+
+#
 # -------------------------------
 # ROUTE: Trang cá nhân
 # -------------------------------
