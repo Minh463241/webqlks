@@ -107,9 +107,9 @@ def search():
 # -------------------------------
 # Blueprint AUTH (Đăng ký, đăng nhập, cập nhật avatar)
 # -------------------------------
-auth_bp = Blueprint('auth_bp', __name__)
 
-@auth_bp.route('/login', methods=['GET', 'POST'])
+
+@app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'GET':
         return render_template('login.html')
@@ -146,12 +146,12 @@ def login():
                 flash("Không tìm thấy tài khoản với email này", "error")
                 return redirect(url_for('auth_bp.login'))
 
-@auth_bp.route('/logout')
+@app.route('/logout')
 def logout():
     session.clear()
     return redirect(url_for('index'))
 
-@auth_bp.route('/register', methods=['GET', 'POST'])
+@app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'GET':
         return render_template('register.html')
@@ -185,7 +185,7 @@ def register():
             flash("Đăng ký thất bại.", "error")
             return redirect(url_for('auth_bp.register'))
 
-@auth_bp.route('/update_avatar', methods=['GET', 'POST'])
+@app.route('/update_avatar', methods=['GET', 'POST'])
 def update_avatar():
     if 'user_id' not in session or 'email' not in session:
         flash("Bạn cần đăng nhập để thay đổi avatar.", "error")
