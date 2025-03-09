@@ -1,16 +1,20 @@
 import os
 from pymongo import MongoClient
+from dotenv import load_dotenv
 from datetime import datetime
 from bson import ObjectId
 
-# ---------------------------
-# Cấu hình MongoDB
-# ---------------------------
-MONGO_URI = "mongodb+srv://minh:123@cluster0.wcrhx.mongodb.net/qlksda?retryWrites=true&w=majority&appName=Cluster0"
-DB_NAME = "qlksda"
+# Load biến môi trường từ .env (nếu có)
+load_dotenv()
+
+# Lấy URI và tên DB từ biến môi trường
+MONGO_URI = os.environ.get("MONGO_URI")
+if not MONGO_URI:
+    raise Exception("MONGO_URI chưa được thiết lập trong biến môi trường")
 
 client = MongoClient(MONGO_URI)
-db = client[DB_NAME]
+db_name = os.environ.get("DB_NAME", "qlksda")
+db = client[db_name]
 
 # ---------------------------
 # Các collection
@@ -26,7 +30,7 @@ staff_collection            = db['staff']
 rooms_collection            = db['rooms']
 
 # ---------------------------
-# KHÁCH HÀNG
+# Khách hàng
 # ---------------------------
 def get_customer_by_email(email):
     return customers_collection.find_one({'Email': email})
@@ -49,12 +53,8 @@ def update_user_avatar(email, avatar_filename):
     )
     return result.modified_count
 
-def update_customer(email, update_data):
-    result = customers_collection.update_one({"Email": email}, {"$set": update_data})
-    return result.modified_count
-
 # ---------------------------
-# ẢNH PHÒNG
+# Ảnh phòng
 # ---------------------------
 def create_room_image(room_image_data):
     result = room_images_collection.insert_one(room_image_data)
@@ -64,7 +64,7 @@ def get_room_images_by_room(ma_phong):
     return list(room_images_collection.find({'MaPhong': ma_phong}))
 
 # ---------------------------
-# ĐẶT PHÒNG
+# Đặt phòng
 # ---------------------------
 def create_booking(booking_data):
     result = bookings_collection.insert_one(booking_data)
@@ -74,7 +74,10 @@ def get_booking_by_id(ma_dat_phong):
     return bookings_collection.find_one({'MaDatPhong': ma_dat_phong})
 
 def update_booking(ma_dat_phong, update_data):
-    result = bookings_collection.update_one({'MaDatPhong': ma_dat_phong}, {'$set': update_data})
+    result = bookings_collection.update_one(
+        {'MaDatPhong': ma_dat_phong},
+        {'$set': update_data}
+    )
     return result.modified_count
 
 def is_room_booked(ma_phong, checkin_date, checkout_date):
@@ -86,7 +89,7 @@ def is_room_booked(ma_phong, checkin_date, checkout_date):
     return booking is not None
 
 # ---------------------------
-# DỊCH VỤ
+# Dịch vụ
 # ---------------------------
 def get_service_by_id(ma_dich_vu):
     return services_collection.find_one({'MaDichVu': ma_dich_vu})
@@ -99,7 +102,7 @@ def get_all_services():
     return list(services_collection.find())
 
 # ---------------------------
-# HÓA ĐƠN
+# Hóa đơn
 # ---------------------------
 def create_invoice(invoice_data):
     result = invoices_collection.insert_one(invoice_data)
@@ -112,7 +115,7 @@ def get_all_invoices():
     return list(invoices_collection.find())
 
 # ---------------------------
-# HÓA ĐƠN DỊCH VỤ
+# Hóa đơn dịch vụ
 # ---------------------------
 def create_invoice_service(invoice_service_data):
     result = invoice_services_collection.insert_one(invoice_service_data)
@@ -122,7 +125,7 @@ def get_invoice_services_by_invoice(ma_hoa_don):
     return list(invoice_services_collection.find({'MaHoaDon': ma_hoa_don}))
 
 # ---------------------------
-# LOẠI PHÒNG
+# Loại phòng
 # ---------------------------
 def get_all_room_types():
     return list(room_types_collection.find())
@@ -147,9 +150,9 @@ def add_room_to_db(so_phong, ma_loai_phong, mo_ta, trang_thai):
     
     price = room_type.get('price', 0)
     room_data = {
-        'MaPhong': None,
+        'MaPhong': None,  # Sẽ được cập nhật sau khi chèn
         'SoPhong': so_phong,
-        'MaLoaiPhong': ma_loai_phong,
+        'MaLoaiPhong': ma_loai_phong,  # Lưu ID loại phòng dưới dạng string
         'TrangThai': trang_thai,
         'MoTa': mo_ta,
         'price': price,
@@ -157,60 +160,86 @@ def add_room_to_db(so_phong, ma_loai_phong, mo_ta, trang_thai):
     }
     return create_room(room_data)
 
-def add_room_with_image(file_path, filename, so_phong, ma_loai_phong, mo_ta, image_description="", trang_thai="Trống"):
+def add_room_with_image(file_path, filename, so_phong, ma_loai_phong, mo_ta, image_description, trang_thai):
     # Tạo phòng mới và lấy ID phòng
     room_id = add_room_to_db(so_phong, ma_loai_phong, mo_ta, trang_thai)
     
-    # Sử dụng hàm upload từ file upload.py để tải ảnh lên Cloudinary
-    from drive_upload import upload_file_to_cloudinary
-    image_url = upload_file_to_cloudinary(file_path, filename, folder="rooms")
-    
+    # Sử dụng hàm upload từ file upload_cloudinary.py (đã tách riêng upload lên Cloudinary)
+    from drive_upload import upload_image
+    image_url = upload_image(file_path)
+
     room_image_data = {
         'MaAnh': None,
-        'MaPhong': room_id,
-        'DuongDanAnh': image_url,
+        'MaPhong': room_id,         # Liên kết ảnh với phòng vừa tạo
+        'DuongDanAnh': image_url,   # Đường dẫn ảnh từ Cloudinary
         'MoTa': image_description,
         'uploaded_at': datetime.utcnow()
     }
     create_room_image(room_image_data)
     
-    # Cập nhật document phòng với thông tin ảnh
+    # Cập nhật document phòng với thông tin ảnh để hiển thị trong danh sách phòng
     update_room(room_id, {'image_url': image_url, 'image_url_hd': image_url})
     
     return room_id
 
 # ---------------------------
-# PHÒNG
+# Nhân viên (Admin)
 # ---------------------------
-def create_room(room_data):
-    doc = dict(room_data)
-    doc.pop('MaPhong', None)
-    result = rooms_collection.insert_one(doc)
-    inserted_id = result.inserted_id
-    inserted_id_str = str(inserted_id)
-    
-    update_result = rooms_collection.update_one({'_id': inserted_id}, {'$set': {'MaPhong': inserted_id_str}})
-    if update_result.modified_count == 0:
-        print("[Warning] Không thể cập nhật MaPhong cho document vừa chèn.")
-    return inserted_id_str
+def get_staff_by_email(email):
+    return staff_collection.find_one({'Email': email})
 
+def create_staff(staff_data):
+    result = staff_collection.insert_one(staff_data)
+    return str(result.inserted_id)
+
+def get_all_staff():
+    return list(staff_collection.find())
+
+def get_admin_by_email_and_password(email, password):
+    admin = staff_collection.find_one({'Email': email})
+    if admin and admin.get('password') == password:
+        return admin
+    return None
+
+# ---------------------------
+# Phòng
+# ---------------------------
 def get_all_rooms():
     return list(rooms_collection.find())
 
 def get_room_by_id(ma_phong):
     return rooms_collection.find_one({'MaPhong': ma_phong})
 
+def create_room(room_data):
+    # Sao chép dữ liệu và loại bỏ 'MaPhong' nếu có
+    doc = dict(room_data)
+    doc.pop('MaPhong', None)
+    
+    # Chèn document vào MongoDB
+    result = rooms_collection.insert_one(doc)
+    inserted_id = result.inserted_id
+    inserted_id_str = str(inserted_id)
+    
+    # Cập nhật lại trường 'MaPhong' với giá trị của inserted_id (dạng chuỗi)
+    update_result = rooms_collection.update_one(
+        {'_id': inserted_id},
+        {'$set': {'MaPhong': inserted_id_str}}
+    )
+    if update_result.modified_count == 0:
+        print("[Warning] Không thể cập nhật MaPhong cho document vừa chèn.")
+    
+    return inserted_id_str
+
 def update_room(ma_phong, update_data):
     result = rooms_collection.update_one({'MaPhong': ma_phong}, {'$set': update_data})
     return result.modified_count
 
-# ---------------------------
-# NHÂN VIÊN (Admin)
-# ---------------------------
-def get_staff_by_email(email):
-    return staff_collection.find_one({'Email': email})
-
 def create_staff(staff_data):
+    """
+    Tạo một tài khoản nhân viên mới.
+    Nếu không có trường 'role' trong staff_data, mặc định gán là 'staff'.
+    Lưu ý: Nên mã hóa mật khẩu trước khi lưu.
+    """
     if 'role' not in staff_data or not staff_data['role']:
         staff_data['role'] = 'staff'
     staff_data['created_at'] = datetime.utcnow()
@@ -218,38 +247,62 @@ def create_staff(staff_data):
     return str(result.inserted_id)
 
 def get_all_staff():
-    return list(staff_collection.find({}, {"HoTen": 1, "Email": 1, "role": 1}))
+    """
+    Lấy danh sách tất cả nhân viên, bao gồm các trường cần thiết như tên, email và role.
+    """
+    staff_list = list(staff_collection.find({}, {"HoTen": 1, "Email": 1, "role": 1}))
+    return staff_list
 
 def update_staff_role(staff_id, new_role):
+    """
+    Cập nhật vai trò (role) của nhân viên.
+    Chỉ chấp nhận các giá trị role hợp lệ: 'admin' hoặc 'staff'.
+    """
     if new_role not in ['admin', 'staff']:
         raise ValueError("Vai trò không hợp lệ")
-    result = staff_collection.update_one({"_id": ObjectId(staff_id)}, {"$set": {"role": new_role}})
+    result = staff_collection.update_one(
+        {"_id": ObjectId(staff_id)},
+        {"$set": {"role": new_role}}
+    )
     return result.modified_count
 
 def get_staff_by_id(staff_id):
+    """
+    Lấy thông tin của 1 nhân viên theo _id.
+    """
     return staff_collection.find_one({"_id": ObjectId(staff_id)})
 
 def update_staff_info(staff_id, update_data):
-    result = staff_collection.update_one({"_id": ObjectId(staff_id)}, {"$set": update_data})
+    """
+    Cập nhật thông tin của nhân viên dựa trên staff_id.
+    update_data là một dictionary chứa các trường cần cập nhật.
+    """
+    result = staff_collection.update_one(
+        {"_id": ObjectId(staff_id)},
+        {"$set": update_data}
+    )
     return result.modified_count
 
 def delete_staff(staff_id):
+    """
+    Xóa tài khoản nhân viên khỏi collection.
+    """
     result = staff_collection.delete_one({"_id": ObjectId(staff_id)})
     return result.deleted_count
 
-def get_admin_by_email_and_password(email, password):
-    admin = staff_collection.find_one({"Email": email})
-    if admin and admin.get("password") == password and admin.get("role") == "admin":
-        return admin
-    return None
-
 # ---------------------------
-# LỊCH SỬ ĐẶT PHÒNG & DỊCH VỤ SỬ DỤNG
+# Các hàm lấy dữ liệu cho trang cá nhân (lịch sử đặt phòng, dịch vụ đã sử dụng)
 # ---------------------------
 def get_booking_history_by_customer(email):
+    """
+    Lấy danh sách booking (đặt phòng) của khách hàng dựa trên email.
+    """
     return list(bookings_collection.find({"email": email}))
 
 def get_services_used_by_customer(email):
+    """
+    Lấy danh sách dịch vụ đã sử dụng của khách hàng dựa trên email.
+    """
     invoices = list(invoices_collection.find({"email": email}))
     services_used = []
     for invoice in invoices:

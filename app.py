@@ -1,12 +1,21 @@
 import os
 import hashlib
 import urllib.parse
-from flask import Flask, flash, render_template, request, redirect, url_for, session, Blueprint, jsonify
+from flask import Flask, flash, render_template, request, redirect, url_for, session, jsonify
 from werkzeug.utils import secure_filename
 import functools
 from datetime import timedelta, datetime
 import hmac
-from drive_upload import upload_file_to_cloudinary
+
+import cloudinary
+import cloudinary.uploader
+# Cấu hình Cloudinary trực tiếp trong app.py
+cloudinary.config(
+    cloud_name="dwczro6hp",
+    api_key="648677879979597",
+    api_secret="-1D5fNq5hrtfGoIeZ8U7n8GHWi0",
+    secure=True
+)
 
 # Import các hàm từ db_mongo.py (MongoDB)
 from db_mongo import (
@@ -31,24 +40,20 @@ from db_mongo import (
     staff_collection,
     get_booking_history_by_customer,
     get_services_used_by_customer,
-    update_customer,
-    
+    update_customer
 )
 
 # -------------------------------
 # Cài đặt Stripe
 # -------------------------------
 import stripe
-# Thay bằng Secret key test của bạn
 stripe.api_key = "sk_test_51QzvBe4ItrNbWOZiuMzul21da8fG1mtQa5hj4nznqqje0PbD0zKUpKekh4rcQWlSrSnlzrCknEPAqAKYQdbpmNTs00u4BJTBxR"
-
-
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 app.permanent_session_lifetime = timedelta(days=7)
 
-# Cấu hình cho file upload avatar (sẽ không dùng cho local nữa)
+# Cấu hình cho file upload (sử dụng cho avatar và phòng)
 UPLOAD_FOLDER = os.path.join(app.root_path, 'static', 'avatars')
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
@@ -67,7 +72,7 @@ def change_language(lang):
     return response
 
 # -------------------------------
-# ROUTE: Trang chủ
+# ROUTE: Trang chủ (hiển thị danh sách phòng)
 # -------------------------------
 @app.route('/')
 def index():
@@ -75,7 +80,7 @@ def index():
     user_avatar = session.get('avatar', 'default.jpg')
     rooms = get_all_rooms()  # Lấy danh sách phòng từ MongoDB
 
-    # Các bộ lọc nếu bạn có sử dụng
+    # Các bộ lọc (nếu có)
     popular = session.get('popular')
     tiennghi = session.get('tiennghi')
     xephang = session.get('xephang')
@@ -93,7 +98,7 @@ def index():
     )
 
 # -------------------------------
-# ROUTE: Tìm kiếm
+# ROUTE: Tìm kiếm (hiển thị lại trang chủ)
 # -------------------------------
 @app.route('/search', methods=['GET'])
 def search():
@@ -105,10 +110,8 @@ def search():
     return render_template('index.html')
 
 # -------------------------------
-# Blueprint AUTH (Đăng ký, đăng nhập, cập nhật avatar)
+# ROUTE: Đăng nhập
 # -------------------------------
-
-
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'GET':
@@ -138,19 +141,17 @@ def login():
                     return jsonify({"success": False, "message": "Mật khẩu không chính xác"})
                 else:
                     flash("Mật khẩu không chính xác", "error")
-                    return redirect(url_for('auth_bp.login'))
+                    return redirect(url_for('login'))
         else:
             if request.is_json:
                 return jsonify({"success": False, "message": "Không tìm thấy tài khoản với email này"})
             else:
                 flash("Không tìm thấy tài khoản với email này", "error")
-                return redirect(url_for('auth_bp.login'))
+                return redirect(url_for('login'))
 
-@app.route('/logout')
-def logout():
-    session.clear()
-    return redirect(url_for('index'))
-
+# -------------------------------
+# ROUTE: Đăng ký
+# -------------------------------
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'GET':
@@ -165,7 +166,7 @@ def register():
         
         if get_customer_by_email(email):
             flash("Email đã được sử dụng, vui lòng sử dụng email khác.", "error")
-            return redirect(url_for('auth_bp.register'))
+            return redirect(url_for('register'))
         
         customer_data = {
             'HoTen': ho_ten,
@@ -180,11 +181,14 @@ def register():
         user_id = create_customer(customer_data)
         if user_id:
             flash("Đăng ký thành công! Vui lòng đăng nhập.", "success")
-            return redirect(url_for('auth_bp.login'))
+            return redirect(url_for('login'))
         else:
             flash("Đăng ký thất bại.", "error")
-            return redirect(url_for('auth_bp.register'))
+            return redirect(url_for('register'))
 
+# -------------------------------
+# ROUTE: Cập nhật avatar
+# -------------------------------
 @app.route('/update_avatar', methods=['GET', 'POST'])
 def update_avatar():
     if 'user_id' not in session or 'email' not in session:
@@ -205,19 +209,25 @@ def update_avatar():
         
         if file and allowed_file(file.filename):
             filename = secure_filename(file.filename)
-            # Lưu tạm file vào thư mục cấu hình (UPLOAD_FOLDER)
+            filename = f"user_{session['user_id']}_{filename}"
             file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            if not os.path.exists(app.config['UPLOAD_FOLDER']):
+                os.makedirs(app.config['UPLOAD_FOLDER'])
             file.save(file_path)
-            # Upload file lên Cloudinary qua hàm upload_file_to_cloudinary
-            avatar_url = upload_file_to_cloudinary(file_path, filename, folder="avatars")
-            update_user_avatar(session['email'], avatar_url)
-            session['avatar'] = avatar_url
+            update_user_avatar(session['email'], filename)
+            session['avatar'] = filename
             flash("Avatar cập nhật thành công!", "success")
             return redirect(url_for('index'))
         else:
             flash("Loại file không được chấp nhận.", "error")
             return redirect(request.url)
-
+# -------------------------------
+# ROUTE: Đăng xuất
+# -------------------------------
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('index'))
 
 # -------------------------------
 # ROUTE: Quản trị Admin
@@ -236,16 +246,13 @@ def admin_login():
     if request.method == 'POST':
         email = request.form.get('email')
         password = request.form.get('password')
-        # Tìm tài khoản theo email
         user = staff_collection.find_one({"Email": email})
         if user and user.get("password") == password:
             session['user_id'] = str(user['_id'])
             session['role'] = user.get('role', 'staff')
-            # Nếu tài khoản không phải admin thì không cho truy cập admin
             if session['role'] != 'admin':
                 flash("Tài khoản nhân viên không được phép truy cập chức năng admin", "danger")
                 return redirect(url_for('staff_dashboard'))
-            # Chuyển hướng đến trang dashboard admin
             return redirect(url_for('admin_dashboard'))
         else:
             error = "Thông tin đăng nhập không chính xác"
@@ -307,10 +314,9 @@ def add_room():
             filename = secure_filename(file.filename)
             file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             file.save(file_path)
-            # Hàm add_room_with_image sẽ upload ảnh lên Cloudinary qua hàm trong upload.py
+            # Hàm add_room_with_image sẽ upload ảnh lên Cloudinary qua hàm upload_file_to_cloudinary
             add_room_with_image(file_path, filename, so_phong, ma_loai_phong, mo_ta, image_description="Ảnh phòng", trang_thai=trang_thai)
         else:
-            # Nếu không có file ảnh, chỉ thêm phòng vào DB
             add_room_to_db(so_phong, ma_loai_phong, mo_ta, trang_thai)
         
         flash("Thêm phòng thành công!", "success")
