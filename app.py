@@ -16,7 +16,6 @@ from db_mongo import (
     get_all_rooms,
     get_all_room_types,
     add_room_type,
-    get_admin_by_email_and_password,
     get_room_by_id,
     is_room_booked,
     create_booking,
@@ -338,7 +337,6 @@ if __name__ == '__main__':
     app.run(debug=True)
 
 
-#
 # -------------------------------
 # ROUTE: Trang cá nhân
 # -------------------------------

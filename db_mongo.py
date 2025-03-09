@@ -229,12 +229,21 @@ def get_room_by_id(ma_phong):
 def update_room(ma_phong, update_data):
     result = rooms_collection.update_one({'MaPhong': ma_phong}, {'$set': update_data})
     return result.modified_count
+#admin
+def get_admin_by_email_and_password(email, password):
+    admin = staff_collection.find_one({
+        "Email": email,
+        "password": password,
+        "role": "admin"
+    })
+    return admin
 
 # ---------------------------
 # NHÂN VIÊN (Admin)
 # ---------------------------
 def get_staff_by_email(email):
     return staff_collection.find_one({'Email': email})
+
 
 def create_staff(staff_data):
     """
@@ -291,6 +300,8 @@ def delete_staff(staff_id):
     """
     result = staff_collection.delete_one({"_id": ObjectId(staff_id)})
     return result.deleted_count
+
+
 
 # ---------------------------
 # LỊCH SỬ ĐẶT PHÒNG & DỊCH VỤ SỬ DỤNG
